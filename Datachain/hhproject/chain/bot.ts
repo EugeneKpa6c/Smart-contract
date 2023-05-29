@@ -1,10 +1,6 @@
 import { ethers } from 'hardhat';
 import TelegramBot from 'node-telegram-bot-api';
 
-// Укажите ваш Account и его Private Key
-const account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-
 // Установите адрес локально запущенной ноды Hardhat
 const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545/');
 
@@ -460,10 +456,23 @@ const contractABI = [
 // Инициализация бота
 const bot = new TelegramBot('6149571891:AAGvYdiRWcjnHDcrDrwn-GIMHpqvmyTy9-k', { polling: true });
 
+// Хранилище учетных данных пользователей
+let userCredentials = {};
+
 // Обработка команды /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, 'Добро пожаловать! Для пополнения баланса отправьте команду /deposit <ETH>, а для проверки баланса используйте команду /balance.');
+  bot.sendMessage(chatId, 'Добро пожаловать! Установите свой адрес и приватный ключ с помощью /set_credentials <account> <privateKey>. Для пополнения баланса отправьте команду /deposit <ETH>, а для проверки баланса используйте команду /balance.');
+});
+
+// Обработка команды /set_credentials
+bot.onText(/\/set_credentials (\w+) (\w+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const account = match[1];
+  const privateKey = match[2];
+
+  userCredentials[chatId] = { account, privateKey };
+  bot.sendMessage(chatId, 'Учетные данные установлены успешно.');
 });
 
 // Обработка команды /deposit
@@ -472,6 +481,7 @@ bot.onText(/\/deposit (\d+\.?\d*)/, async (msg, match) => {
   const amount = match[1];  // Вводите сумму в ETH
 
   try {
+    const { privateKey } = userCredentials[chatId];
     const wallet = new ethers.Wallet(privateKey, provider);
     const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
@@ -488,12 +498,12 @@ bot.onText(/\/deposit (\d+\.?\d*)/, async (msg, match) => {
   }
 });
 
-
 // Обработка команды /balance
 bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
+    const { account, privateKey } = userCredentials[chatId];
     const wallet = new ethers.Wallet(privateKey, provider);
     const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
@@ -506,10 +516,6 @@ bot.onText(/\/balance/, async (msg) => {
     console.error(error);
   }
 });
-
-
-
-
 
 let datasetData = {};
 let state = '';
@@ -543,6 +549,7 @@ bot.on('message', async (msg) => {
     const priceWei = ethers.utils.parseEther(msg.text);
 
     try {
+      const { privateKey } = userCredentials[chatId];
       const wallet = new ethers.Wallet(privateKey, provider);
       const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
@@ -566,6 +573,7 @@ bot.onText(/\/search_dataset (.+)/, async (msg, match) => {
   const name = match[1];
 
   try {
+    const { privateKey } = userCredentials[chatId];
     const wallet = new ethers.Wallet(privateKey, provider);
     const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
@@ -605,6 +613,7 @@ bot.on('callback_query', async (query) => {
   const datasetName = data.name;
 
   try {
+    const { account, privateKey } = userCredentials[chatId];
     const wallet = new ethers.Wallet(privateKey, provider);
     const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
@@ -625,4 +634,3 @@ bot.on('callback_query', async (query) => {
     console.error(error);
   }
 });
-
